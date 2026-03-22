@@ -314,30 +314,42 @@
     const plan = dpFindMembershipPlanById(mPlan.value);
     if(!plan){ alert("Selecciona un tipo de membresía."); return; }
 
-    const ticketId = dpChargeMembership({
-  paymentMethod: (document.getElementById('membresiaPago')?.value || 'efectivo'),
+    try{
+      const ticketId = dpChargeMembership({
+        paymentMethod: (document.getElementById("membresiaPago")?.value || "efectivo"),
+        clientId: mClientId.value,
+        planId: plan.id,
+        startDate: mStart.value,
+        notes: (mNotes.value||"").trim()
+      });
 
-      clientId: mClientId.value,
-      planId: plan.id,
-      startDate: mStart.value,
-      notes: (mNotes.value||"").trim()
-    });
-
-    mStatus.textContent = "Membresía cobrada. Ticket: " + (ticketId||"");
-    renderList();
-
-    if(mMakeTicket.checked && ticketId){
-      const sale = (state().sales||[]).find(s=>s.id===ticketId);
-      if(sale){
-        const t = buildTicketHtmlFromSale(sale);
-        mTicketPreview.innerHTML = t.pre;
-        lastTicketHtml = t.html;
-        lastTicketTitle = t.title;
-        mPrint.disabled = false;
+      if(!ticketId){
+        mStatus.textContent = "No se pudo registrar el cobro de la membresía.";
+        mPrint.disabled = true;
+        return;
       }
-    }else{
+
+      mStatus.textContent = "Membresía cobrada. Ticket: " + ticketId;
+      renderList();
+
+      if(mMakeTicket.checked){
+        const sale = (state().sales||[]).find(s=>s.id===ticketId);
+        if(sale){
+          const t = buildTicketHtmlFromSale(sale);
+          mTicketPreview.innerHTML = t.pre;
+          lastTicketHtml = t.html;
+          lastTicketTitle = t.title;
+          mPrint.disabled = false;
+          return;
+        }
+      }
+
       mTicketPreview.innerHTML = "Sin ticket.";
       lastTicketHtml = "";
+      mPrint.disabled = true;
+    }catch(err){
+      console.error("Error al cobrar membresía:", err);
+      mStatus.textContent = "Error al registrar membresía. Revisa consola o ticket.";
       mPrint.disabled = true;
     }
   }
