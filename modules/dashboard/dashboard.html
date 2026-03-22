@@ -1,0 +1,206 @@
+<div class="dp-page">
+  <!-- Barra de estado (mensaje rápido) -->
+  <div class="dp-statusbar" id="dp-statusbar">
+    <div class="dp-statusbar__inner">
+      <span class="dp-statusbar__icon" aria-hidden="true">🔥</span>
+      <span class="dp-statusbar__text" id="dp-status-text">—</span>
+    </div>
+  </div>
+
+  <div class="dp-page__head">
+    <h1>Dashboard</h1>
+    <div class="dp-page__sub">Resumen general (ventas, inventario, bodega y membresías).</div>
+  </div>
+
+  <!-- Filtros / rango -->
+  <div class="dp-card dp-filters">
+    <div class="dp-filters__l">
+      <div class="dp-filters__title">Rango</div>
+      <div class="dp-filters__chips">
+        <button class="dp-chip" type="button" data-preset="today">Hoy</button>
+        <button class="dp-chip" type="button" data-preset="7d">7 días</button>
+        <button class="dp-chip" type="button" data-preset="30d">30 días</button>
+        <button class="dp-chip" type="button" data-preset="month">Este mes</button>
+      </div>
+    </div>
+
+    <div class="dp-filters__r">
+      <label class="dp-field">
+        <span>Desde</span>
+        <input type="date" id="dp-range-from" />
+      </label>
+      <label class="dp-field">
+        <span>Hasta</span>
+        <input type="date" id="dp-range-to" />
+      </label>
+      <button class="dp-btn" id="dp-range-apply" type="button">Aplicar</button>
+    </div>
+
+    <div class="dp-filters__meta">
+      <span class="dp-pill" id="dp-range-label">—</span>
+      <span class="dp-muted" id="dp-range-hint">—</span>
+    </div>
+  </div>
+
+  <!-- KPIs (estilo premium como mockup) -->
+  <div class="dp-grid dp-kpisTop" id="dp-kpis-top">
+    <div class="dp-kpiCard dp-kpiCard--red">
+      <div class="dp-kpiCard__head">
+        <div class="dp-kpiCard__icon" aria-hidden="true">🛍️</div>
+        <div class="dp-kpiCard__meta">
+          <div class="dp-kpiCard__label">Ventas (Rango)</div>
+          <div class="dp-kpiCard__value" id="dp-kpi-sales-range">$0.00</div>
+          <div class="dp-kpiCard__hint" id="dp-kpi-sales-range-hint">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dp-kpiCard dp-kpiCard--green">
+      <div class="dp-kpiCard__head">
+        <div class="dp-kpiCard__icon" aria-hidden="true">💰</div>
+        <div class="dp-kpiCard__meta">
+          <div class="dp-kpiCard__label">Utilidad Neta</div>
+          <div class="dp-kpiCard__value" id="dp-kpi-net">$0.00</div>
+          <div class="dp-kpiCard__hint" id="dp-kpi-net-hint">Ventas - Gastos</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dp-kpiCard dp-kpiCard--slate">
+      <div class="dp-kpiCard__head">
+        <div class="dp-kpiCard__icon" aria-hidden="true">🧾</div>
+        <div class="dp-kpiCard__meta">
+          <div class="dp-kpiCard__label">Gastos</div>
+          <div class="dp-kpiCard__value" id="dp-kpi-exp-range">$0.00</div>
+          <div class="dp-kpiCard__hint">En el rango</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dp-grid dp-kpisSub" id="dp-kpis">
+    <div class="dp-kpiMini dp-kpiMini--green">
+      <div class="dp-kpiMini__icon" aria-hidden="true">📅</div>
+      <div>
+        <div class="dp-kpiMini__label">Ventas Hoy</div>
+        <div class="dp-kpiMini__value" id="dp-kpi-sales-today">$0.00</div>
+        <div class="dp-kpiMini__hint" id="dp-kpi-sales-today-hint">—</div>
+      </div>
+    </div>
+
+    <div class="dp-kpiMini dp-kpiMini--slate">
+      <div class="dp-kpiMini__icon" aria-hidden="true">📈</div>
+      <div>
+        <div class="dp-kpiMini__label">Últimos 7 Días</div>
+        <div class="dp-kpiMini__value" id="dp-kpi-sales-7">$0.00</div>
+        <div class="dp-kpiMini__hint">Referencia rápida</div>
+      </div>
+    </div>
+
+    <div class="dp-kpiMini dp-kpiMini--red">
+      <div class="dp-kpiMini__icon" aria-hidden="true">📦</div>
+      <div>
+        <div class="dp-kpiMini__label">Stock Crítico</div>
+        <div class="dp-kpiMini__value" id="dp-kpi-lowstock">0</div>
+        <div class="dp-kpiMini__hint">Stock ≤ <span id="dp-kpi-lowstock-th">5</span></div>
+      </div>
+    </div>
+
+    <div class="dp-kpiMini dp-kpiMini--blue">
+      <div class="dp-kpiMini__icon" aria-hidden="true">🧩</div>
+      <div>
+        <div class="dp-kpiMini__label" id="dp-kpi-top-exp-label">Gasto principal</div>
+        <div class="dp-kpiMini__value" id="dp-kpi-top-exp">$0.00</div>
+        <div class="dp-kpiMini__hint" id="dp-kpi-top-exp-hint">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dp-grid dp-panels">
+    <div class="dp-card">
+      <div class="dp-card__head">
+        <div>
+          <div class="dp-card__title">Ventas por día</div>
+          <div class="dp-card__sub" id="dp-chart-7d-sub">Total por día (rango)</div>
+        </div>
+        <button class="dp-btn dp-btn--ghost" id="dp-dash-refresh">Actualizar</button>
+      </div>
+      <canvas class="dp-chart" id="dp-chart-7d" height="220"></canvas>
+    </div>
+
+    <div class="dp-card">
+      <div class="dp-card__head">
+        <div>
+          <div class="dp-card__title">Formas de pago</div>
+          <div class="dp-card__sub" id="dp-chart-pay-sub">Distribución (rango)</div>
+        </div>
+      </div>
+      <canvas class="dp-chart" id="dp-chart-pay" height="220"></canvas>
+      <div class="dp-miniLegend" id="dp-legend-pay"></div>
+    </div>
+  </div>
+
+  <div class="dp-grid dp-panels">
+    <div class="dp-card">
+      <div class="dp-card__head">
+        <div>
+          <div class="dp-card__title">Membresías</div>
+          <div class="dp-card__sub">Activas, por vencer y vencidas</div>
+        </div>
+      </div>
+      <div class="dp-grid dp-mini3">
+        <div class="dp-miniBox dp-miniBox--ok">
+          <div class="dp-miniBox__label">Activas</div>
+          <div class="dp-miniBox__value" id="dp-m-active">0</div>
+        </div>
+        <div class="dp-miniBox dp-miniBox--warn">
+          <div class="dp-miniBox__label">Vence ≤ 5 días</div>
+          <div class="dp-miniBox__value" id="dp-m-soon">0</div>
+        </div>
+        <div class="dp-miniBox dp-miniBox--bad">
+          <div class="dp-miniBox__label">Vencidas</div>
+          <div class="dp-miniBox__value" id="dp-m-expired">0</div>
+        </div>
+      </div>
+
+      <div class="dp-listHead">
+        <div class="dp-listHead__title">Próximas a vencer</div>
+        <div class="dp-listHead__sub">Top 8</div>
+      </div>
+      <div class="dp-list" id="dp-m-list"></div>
+    </div>
+
+    <div class="dp-card">
+      <div class="dp-card__head">
+        <div>
+          <div class="dp-card__title">Productos más vendidos</div>
+          <div class="dp-card__sub" id="dp-top-products-sub">Rango (por piezas)</div>
+        </div>
+      </div>
+      <div class="dp-list" id="dp-top-products"></div>
+    </div>
+  </div>
+
+  <div class="dp-grid dp-panels">
+    <div class="dp-card">
+      <div class="dp-card__head">
+        <div>
+          <div class="dp-card__title">Últimas ventas</div>
+          <div class="dp-card__sub" id="dp-last-sales-sub">Rango</div>
+        </div>
+      </div>
+      <div class="dp-list" id="dp-last-sales"></div>
+    </div>
+
+    <div class="dp-card">
+      <div class="dp-card__head">
+        <div>
+          <div class="dp-card__title">Gastos por categoría</div>
+          <div class="dp-card__sub" id="dp-exp-cat-sub">Rango</div>
+        </div>
+      </div>
+      <canvas class="dp-chart" id="dp-chart-exp" height="220"></canvas>
+      <div class="dp-miniLegend" id="dp-legend-exp"></div>
+    </div>
+  </div>
+</div>

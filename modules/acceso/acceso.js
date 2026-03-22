@@ -1,0 +1,529 @@
+/* Acceso - Dinamita POS v0 (IndexedDB local) */
+(function(){
+  const $ = (id)=>document.getElementById(id);
+  const scan = $("a-scan");
+  const status = $("a-status");
+  const lastBox = $("a-last");
+  const btnCheck = $("a-check");
+  const btnRenew = $("a-renew");
+  const btnPrint = $("a-print");
+  const btnClear = $("a-clear");
+  const apm = $("a-apm");
+  const filter = $("a-filter");
+  const btnExport = $("a-export");
+  const tbody = $("a-table").querySelector("tbody");
+  const btnMode = $("a-toggleMode");
+
+  // --- helpers ---
+  const fmtMoney = (n)=>"$" + (Number(n||0)).toFixed(2);
+
+  // IMPORTANTE: NO usar toISOString() para accesos porque eso guarda en UTC.
+  // Queremos que el registro quede con la hora LOCAL del dispositivo.
+  const pad2 = (n)=> String(n).padStart(2,'0');
+  const localDateISO = (d)=> `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const localTime = (d)=> `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  const todayISO = ()=> localDateISO(new Date());
+
+  function state(){ return dpGetState(); }
+
+  function getAccessSettings(){
+    const st = state();
+    st.meta = st.meta || {};
+    st.meta.accessSettings = st.meta.accessSettings || { antiPassbackMinutes: 10 };
+    return st.meta.accessSettings;
+  }
+
+  function setAccessSettings(patch){
+    dpSetState(st=>{
+      st.meta = st.meta || {};
+      st.meta.accessSettings = st.meta.accessSettings || { antiPassbackMinutes: 10 };
+      Object.assign(st.meta.accessSettings, patch||{});
+      return st;
+    });
+  }
+
+  function ensureAccessArrays(){
+    dpSetState(st=>{
+      if(!Array.isArray(st.accessLogs)) st.accessLogs = [];
+      st.meta = st.meta || {};
+      st.meta.accessSettings = st.meta.accessSettings || { antiPassbackMinutes: 10 };
+      return st;
+    });
+  }
+
+  function findClientByToken(token){
+    const st = state();
+    const t = String(token||"").trim();
+    if(!t) return null;
+    // 1) ID exacto (C001)
+    const byId = (st.clients||[]).find(c=>String(c.id||"").toLowerCase()===t.toLowerCase());
+    if(byId) return byId;
+
+    // 2) si el QR trae prefijo, ej "DINAMITA:C001"
+    const m = t.match(/(C\d{3})/i);
+    if(m){
+      const id = m[1].toUpperCase();
+      const c = (st.clients||[]).find(x=>x.id===id);
+      if(c) return c;
+    }
+
+    // 3) por nombre / teléfono
+    const lower = t.toLowerCase();
+    return (st.clients||[]).find(c=>
+      String(c.name||"").toLowerCase().includes(lower) ||
+      String(c.phone||"").replace(/\D/g,'').includes(lower.replace(/\D/g,''))
+    ) || null;
+  }
+
+  function getMembershipStatus(clientId){
+    const st = state();
+    const list = (st.memberships||[]).filter(m=>m && m.clientId===clientId);
+    if(list.length===0) return { status:"none", label:"Sin membresía", detail:"", color:"red" };
+
+    const t = todayISO();
+    // buscar una membresía activa hoy (start<=hoy<=end) con end más lejano
+    const active = list
+      .filter(m=> (m.start||"")<=t && (m.end||"")>=t)
+      .sort((a,b)=> String(b.end||"").localeCompare(String(a.end||"")));
+    const m = active[0] || list[0];
+
+    const end = m.end || "";
+    const start = m.start || "";
+    if(end < t){
+      return { status:"expired", label:"Vencida", detail:`Venció: ${end}`, color:"red", membership:m };
+    }
+    // days left
+    const dEnd = new Date(end);
+    const dNow = new Date(t);
+    const diff = Math.ceil((dEnd - dNow)/(1000*60*60*24));
+    if(diff <= 5){
+      return { status:"warning", label:"Por vencer", detail:`Vence: ${end} (${diff} día(s))`, color:"orange", membership:m };
+    }
+    return { status:"active", label:"Activa", detail:`Vence: ${end}`, color:"green", membership:m };
+  }
+
+  function getLastAllowedAccess(clientId){
+    const st = state();
+    const logs = (st.accessLogs||[]).filter(x=>x && x.clientId===clientId && x.result==="allowed");
+    if(logs.length===0) return null;
+    return logs[0]; // unshift (más reciente)
+  }
+
+  function logAccess({clientId, clientName, result, detail, method="qr"}){
+    dpSetState(st=>{
+      st.accessLogs = st.accessLogs || [];
+      // Guardar con hora LOCAL (no UTC)
+      const d = new Date();
+      const date = localDateISO(d);
+      const time = localTime(d);
+      const at = `${date}T${time}`;
+      st.accessLogs.unshift({
+        id: dpId("A"),
+        atMs: d.getTime(),
+        at,
+        date,
+        time,
+        clientId: clientId || "",
+        clientName: clientName || "",
+        result,
+        detail: detail || "",
+        method
+      });
+      // recortar para evitar crecer infinito
+      if(st.accessLogs.length > 5000) st.accessLogs.length = 5000;
+      return st;
+    });
+  }
+
+  function setStatus(kind, title, meta){
+    status.classList.remove("dp-accessIdle","dp-accessOk","dp-accessWarn","dp-accessBad");
+    if(kind==="ok") status.classList.add("dp-accessOk");
+    else if(kind==="warn") status.classList.add("dp-accessWarn");
+    else if(kind==="bad") status.classList.add("dp-accessBad");
+    else status.classList.add("dp-accessIdle");
+    status.querySelector(".dp-accessTitle")?.remove();
+    status.querySelector(".dp-accessMeta")?.remove();
+    const t = document.createElement("div");
+    t.className="dp-accessTitle";
+    t.textContent = title || "";
+    const m = document.createElement("div");
+    m.className="dp-accessMeta";
+    m.textContent = meta || "";
+    status.appendChild(t);
+    status.appendChild(m);
+  }
+
+  function renderLast(info){
+    const rows = [];
+    const add = (k,v)=>rows.push(`<div class="dp-kvRow"><div class="dp-kvK">${k}</div><div class="dp-kvV">${v||""}</div></div>`);
+    if(!info){ lastBox.innerHTML = '<div class="dp-hint">Aún no hay accesos.</div>'; return; }
+    add("Cliente", `<b>${info.clientName}</b> (${info.clientId})`);
+    add("Resultado", `<b>${info.result.toUpperCase()}</b>`);
+    add("Detalle", info.detail || "");
+    add("Fecha/Hora", `${info.date} ${info.time}`);
+    lastBox.innerHTML = rows.join("");
+  }
+
+  function renderTable(){
+    const st = state();
+    const q = String(filter.value||"").trim().toLowerCase();
+    const logs = (st.accessLogs||[]);
+    const view = q ? logs.filter(x=>
+      (x.clientName||"").toLowerCase().includes(q) ||
+      (x.clientId||"").toLowerCase().includes(q) ||
+      (x.result||"").toLowerCase().includes(q) ||
+      (x.detail||"").toLowerCase().includes(q)
+    ) : logs;
+
+    tbody.innerHTML = view.slice(0,200).map(x=>{
+      const badge = x.result==="allowed" ? "dp-badgeOk" : (x.result==="warning" ? "dp-badgeWarn" : "dp-badgeBad");
+      const label = x.result==="allowed" ? "PERMITIDO" : (x.result==="warning" ? "AVISO" : "DENEGADO");
+      return `<tr>
+        <td>${x.date||""}</td>
+        <td>${x.time||""}</td>
+        <td><b>${escapeHtml(x.clientName||"")}</b><div class="dp-hint">${escapeHtml(x.clientId||"")}</div></td>
+        <td><span class="dp-badge ${badge}">${label}</span></td>
+        <td>${escapeHtml(x.detail||"")}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  function escapeHtml(s){
+    return String(s||"").replace(/[&<>"']/g, (c)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+  }
+
+  function makeCode39Svg(data){
+    const CODE39 = {
+      "0":"nnnwwnwnn","1":"wnnwnnnnw","2":"nnwwnnnnw","3":"wnwwnnnnn","4":"nnnwwnnnw",
+      "5":"wnnwwnnnn","6":"nnwwwnnnn","7":"nnnwnnwnw","8":"wnnwnnwnn","9":"nnwwnnwnn",
+      "A":"wnnnnwnnw","B":"nnwnnwnnw","C":"wnwnnwnnn","D":"nnnnwwnnw","E":"wnnnwwnnn",
+      "F":"nnwnwwnnn","G":"nnnnnwwnw","H":"wnnnnwwnn","I":"nnwnnwwnn","J":"nnnnwwwnn",
+      "K":"wnnnnnnww","L":"nnwnnnnww","M":"wnwnnnnwn","N":"nnnnwnnww","O":"wnnnwnnwn",
+      "P":"nnwnwnnwn","Q":"nnnnnnwww","R":"wnnnnnwwn","S":"nnwnnnwwn","T":"nnnnwnwwn",
+      "U":"wwnnnnnnw","V":"nwwnnnnnw","W":"wwwnnnnnn","X":"nwnnwnnnw","Y":"wwnnwnnnn",
+      "Z":"nwwnwnnnn","-":"nwnnnnwnw",".":"wwnnnnwnn"," ":"nwwnnnwnn","$":"nwnwnwnnn",
+      "/":"nwnwnnnwn","+":"nwnnnwnwn","%":"nnnwnwnwn","*":"nwnnwnwnn"
+    };
+
+    const narrow = 2;
+    const wide = 5;
+    const height = 60;
+
+    const raw = String(data||"").toUpperCase().trim();
+    if(!raw) return "";
+
+    const value = "*" + raw + "*";
+    let x = 0;
+    const rects = [];
+
+    for(const ch of value){
+      const pat = CODE39[ch] || CODE39[" "];
+      for(let i=0;i<pat.length;i++){
+        const w = (pat[i]==="w") ? wide : narrow;
+        if(i % 2 === 0){
+          rects.push(`<rect x="${x}" y="0" width="${w}" height="${height}" />`);
+        }
+        x += w;
+      }
+      // inter-character gap (narrow space)
+      x += narrow;
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${x}" height="${height}" viewBox="0 0 ${x} ${height}" preserveAspectRatio="xMidYMid meet" style="display:block;margin:8px auto 0 auto;">
+      <rect x="0" y="0" width="${x}" height="${height}" fill="#fff" />
+      <g fill="#000">${rects.join("")}</g>
+    </svg>`;
+  }
+
+  function dpPrintHTML(html){
+    // Remove any previous print frame
+    const prev = document.getElementById("dp-print-frame");
+    if(prev) prev.remove();
+
+    const iframe = document.createElement("iframe");
+    iframe.id = "dp-print-frame";
+    iframe.setAttribute("aria-hidden", "true");
+    // Keep it in DOM but off-screen (Android Chrome prints blank if iframe is display:none)
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0.01";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    // Try to print after resources load (logos/barcodes are inline, but keep it safe)
+    const win = iframe.contentWindow;
+    const doPrint = () => {
+      try{
+        win.focus();
+        win.print();
+      }catch(e){
+        console.warn("Print failed:", e);
+      }
+    };
+
+    // Some browsers need a tick
+    setTimeout(doPrint, 250);
+  }
+
+  function exportCSV(){
+    const st = state();
+    const rows = [["Fecha","Hora","Cliente","ID","Resultado","Detalle"]];
+    (st.accessLogs||[]).forEach(x=>{
+      rows.push([x.date||"", x.time||"", x.clientName||"", x.clientId||"", x.result||"", x.detail||""]);
+    });
+    const csv = rows.map(r=>r.map(v=>{
+      const s = String(v??"");
+      return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+    }).join(",")).join("\n");
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `accesos_${todayISO()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function validate(){
+    const token = String(scan.value||"").trim();
+    if(!token){ setStatus("bad","Sin dato","Escanea un código o escribe un nombre/ID."); return; }
+
+    const client = findClientByToken(token);
+    if(!client){
+      setStatus("bad","No encontrado","No existe cliente con ese dato.");
+      btnRenew.disabled = true;
+      btnPrint.disabled = true;
+      logAccess({ clientId:"", clientName:"", result:"denied", detail:`No encontrado (${token})` });
+      renderAfterLog();
+      return;
+    }
+
+    const settings = getAccessSettings();
+    const mins = Number(settings.antiPassbackMinutes||0);
+    const lastAllowed = getLastAllowedAccess(client.id);
+    if(mins>0 && lastAllowed){
+      const lastAt = new Date(lastAllowed.at);
+      const now = new Date();
+      const diffMin = (now - lastAt) / (1000*60);
+      if(diffMin < mins){
+        const left = Math.ceil(mins - diffMin);
+        setStatus("bad","Anti-passback","Entrada repetida. Espera " + left + " min.");
+        btnRenew.disabled = false; // puede renovar aunque sea passback
+        btnPrint.disabled = false;
+        logAccess({ clientId: client.id, clientName: client.name, result:"denied", detail:`Anti-passback (${Math.round(diffMin)} min)` });
+        renderAfterLog();
+        return;
+      }
+    }
+
+    const ms = getMembershipStatus(client.id);
+    if(ms.status==="active"){
+      setStatus("ok","Acceso permitido", `${client.name} • ${ms.detail}`);
+      logAccess({ clientId: client.id, clientName: client.name, result:"allowed", detail:`${ms.label} • ${ms.detail}` });
+      btnRenew.disabled = false;
+      btnPrint.disabled = false;
+    }else if(ms.status==="warning"){
+      setStatus("warn","Acceso permitido (por vencer)", `${client.name} • ${ms.detail}`);
+      logAccess({ clientId: client.id, clientName: client.name, result:"warning", detail:`${ms.label} • ${ms.detail}` });
+      btnRenew.disabled = false;
+      btnPrint.disabled = false;
+    }else{
+      setStatus("bad","Acceso denegado", `${client.name} • ${ms.detail || ms.label}`);
+      logAccess({ clientId: client.id, clientName: client.name, result:"denied", detail:`${ms.label} • ${ms.detail}` });
+      btnRenew.disabled = false;
+      btnPrint.disabled = false;
+    }
+
+    // Guardar para renovar/credencial
+    sessionStorage.setItem("dp_prefill_client_id", client.id);
+    renderAfterLog();
+
+    // UX: después de validar (escáner o manual) dejar listo para el siguiente pase.
+    // Mantener el input enfocado y vacío para que el lector (que funciona como teclado)
+    // pueda mandar el siguiente código sin tocar nada.
+    setTimeout(()=>{
+      scan.value = "";
+      scan.focus();
+    }, 20);
+  }
+
+  function renderAfterLog(){
+    const st = state();
+    const last = (st.accessLogs||[])[0] || null;
+    renderLast(last);
+    renderTable();
+  }
+
+  // --- modo acceso (bloqueo de navegación) ---
+  function isAccessMode(){
+    return sessionStorage.getItem("dp_access_mode")==="1";
+  }
+  function setAccessMode(on){
+    sessionStorage.setItem("dp_access_mode", on ? "1":"0");
+    document.body.classList.toggle("dp-accessMode", !!on);
+    btnMode.textContent = on ? "Modo Acceso: ON" : "Modo Acceso: OFF";
+  }
+
+  function requirePin(){
+    // Reutiliza PIN de configuración si existe, sino "1234"
+    const st = state();
+    const pin = String(st.meta?.securityPin || "1234");
+    const input = prompt("PIN para salir/entrar a Modo Acceso:");
+    return input === pin;
+  }
+
+  function init(){
+    ensureAccessArrays();
+
+    const s = getAccessSettings();
+    apm.value = String(Number(s.antiPassbackMinutes ?? 10));
+
+    // Focus listo para lector
+    setTimeout(()=>scan.focus(), 150);
+
+    // Enter dispara
+    scan.addEventListener("keydown", (e)=>{
+      if(e.key==="Enter"){
+        e.preventDefault();
+        validate();
+      }
+    });
+
+    btnCheck.addEventListener("click", validate);
+
+    btnClear.addEventListener("click", ()=>{
+      scan.value="";
+      scan.focus();
+      btnRenew.disabled = true;
+      btnPrint.disabled = true;
+      setStatus("idle","Listo para escanear","Escanea un código o escribe un nombre/ID.");
+    });
+
+    apm.addEventListener("change", ()=>{
+      const v = Math.max(0, Math.floor(Number(apm.value||0)));
+      apm.value = String(v);
+      setAccessSettings({ antiPassbackMinutes: v });
+    });
+
+    filter.addEventListener("input", renderTable);
+    btnExport.addEventListener("click", exportCSV);
+
+    btnRenew.addEventListener("click", ()=>{
+      const id = sessionStorage.getItem("dp_prefill_client_id") || "";
+      if(!id) return;
+      // Navega a Membresías y precarga cliente (requiere pequeño hook en módulo membresías)
+      try{ sessionStorage.setItem("dp_prefill_client_id", id); }catch(e){}
+      const btn = document.querySelector('#menu button[data-module="membresias"]');
+      if(btn) btn.click();
+    });
+
+    btnPrint.addEventListener("click", ()=>{
+      const id = sessionStorage.getItem("dp_prefill_client_id") || "";
+      if(!id) return;
+      printCredential(id);
+    });
+
+    btnMode.addEventListener("click", ()=>{
+      const on = isAccessMode();
+      if(!on){
+        if(requirePin()) setAccessMode(true);
+      }else{
+        if(requirePin()) setAccessMode(false);
+      }
+    });
+
+    // aplicar modo acceso si ya estaba
+    setAccessMode(isAccessMode());
+
+    // Render inicial
+    renderAfterLog();
+  }
+
+  
+function printCredential(clientId){
+  const st = state();
+  const c = (st.clients||[]).find(x=>x.id===clientId);
+  if(!c){ return; }
+
+  const cfg = (st.meta||{}).business || {};
+  const bizName = cfg.name || "Dinamita Gym";
+  const idText = String(c.id||"").trim();
+
+  const barcodeSvg = makeCode39Svg(idText);
+
+  const html = `
+  <html>
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Credencial ${escapeHtml(idText)}</title>
+      <style>
+        body{ margin:0; font-family: ui-monospace, Menlo, Consolas, monospace; padding:12px; font-weight:800; }
+        .ticket{ max-width:320px; font-size:14px; line-height:1.25; font-weight:900; }
+        .ticket *{ font-size:inherit !important; line-height:inherit !important; font-weight:inherit; }
+        .card{ border:2px solid #000; border-radius:12px; padding:12px; }
+        .brand{ display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+        .logo{ width:44px; height:44px; object-fit:contain; border-radius:10px; border:2px solid #000; background:#fff; }
+        .logo-ph{ width:44px; height:44px; border-radius:10px; border:2px solid #000; display:flex; align-items:center; justify-content:center; font-weight:900; }
+        .t-title{ font-size:18px; font-weight:900; margin:0; }
+        .sub{ font-size:12px; opacity:.8; margin-top:2px; }
+        .row{ display:flex; justify-content:space-between; gap:10px; margin-top:6px; }
+        .lbl{ opacity:.8; }
+        .divider{ border-top:1px dashed #999; margin:10px 0; }
+        .barcodeWrap{ text-align:center; border:2px dashed #000; border-radius:12px; padding:10px; }
+        .code{ margin-top:6px; font-size:18px; letter-spacing:1px; }
+        svg{ max-width:100%; height:auto; }
+        @media print{
+          @page{ size:58mm auto; margin:0; }
+          body{ padding:0; }
+          .ticket{ max-width:58mm; }
+          .card{ border:none; border-radius:0; padding:8px; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="ticket">
+        <div class="card">
+          <div class="brand">
+            ${cfg.logoData ? `<img class="logo" src="${cfg.logoData}" />` : `<div class="logo-ph">DG</div>`}
+            <div>
+              <div class="t-title">${escapeHtml(bizName)}</div>
+              <div class="sub">Credencial de socio</div>
+            </div>
+          </div>
+
+          <div class="row"><div class="lbl">Nombre</div><div>${escapeHtml(c.name||"")}</div></div>
+          <div class="row"><div class="lbl">ID</div><div>${escapeHtml(idText)}</div></div>
+
+          <div class="divider"></div>
+
+          <div class="barcodeWrap">
+            <div class="lbl">Código de barras (Code39)</div>
+            ${barcodeSvg}
+            <div class="code">${escapeHtml(idText)}</div>
+          </div>
+        </div>
+      </div>
+      <script>
+        // Ensure barcode SVG is present before print
+        window.onload = () => { window.print(); };
+      <\/script>
+    </body>
+  </html>
+  `;
+
+  dpPrintHTML(html);
+}
+
+
+  init();
+})();

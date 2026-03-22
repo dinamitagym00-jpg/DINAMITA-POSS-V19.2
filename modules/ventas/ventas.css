@@ -1,0 +1,235 @@
+
+.ventas h1{ margin:0; }
+.ventas__header{ margin-bottom:14px; }
+.muted{ color:#777; }
+.small{ font-size:12px; }
+.ventas__grid{
+  display:grid;
+  grid-template-columns: 1.18fr .82fr;
+  gap:18px;
+  align-items:start;
+}
+.card{
+  border:1px solid #ececec;
+  border-radius:18px;
+  padding:16px;
+  background:linear-gradient(180deg,#ffffff 0%,#fdfdfd 100%);
+  box-shadow:0 10px 30px rgba(17,17,17,.05);
+}
+.card__head{
+  display:grid;
+  grid-template-columns: 1fr 180px;
+  gap:12px;
+  align-items:end;
+}
+.field label{
+  display:block;
+  font-weight:700;
+  margin-bottom:6px;
+}
+.field input, .field select, .field textarea{
+  width:100%;
+  border:1px solid #e4e4e7;
+  border-radius:12px;
+  padding:11px 12px;
+  outline:none;
+  box-sizing:border-box;
+  background:#fff;
+}
+.field textarea{ resize:vertical; min-height:88px; }
+.divider{ height:1px; background:linear-gradient(90deg, rgba(192,0,0,.10), rgba(192,0,0,.04)); margin:14px 0; }
+
+.catalog{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap:12px;
+}
+.pcard{
+  border:1px solid #ededed;
+  border-radius:16px;
+  padding:12px;
+  display:flex;
+  gap:12px;
+  align-items:center;
+  background:linear-gradient(180deg,#fff 0%,#fcfcfc 100%);
+  box-shadow:0 4px 14px rgba(17,17,17,.04);
+  transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.pcard:hover{
+  transform:translateY(-2px);
+  box-shadow:0 12px 24px rgba(17,17,17,.07);
+  border-color:#e7d7d7;
+}
+.pimg{
+  width:58px; height:58px;
+  border-radius:14px;
+  background:#f4f4f5;
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:11px;
+  color:#999;
+  overflow:hidden;
+  border:1px solid #ededed;
+}
+.pimg img{ width:100%; height:100%; object-fit:cover; display:block; }
+.pmeta{ flex:1; min-width:0; }
+.pmeta .name{ font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pmeta .sub{ font-size:12px; color:#666; display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+.pmeta .sub span{ background:#fafafa; border:1px solid #ececec; padding:3px 7px; border-radius:999px; }
+.pactions{ display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
+.price{ font-weight:900; color:#111; }
+.btn{
+  border:none;
+  background:#c00000;
+  color:#fff;
+  padding:10px 12px;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:800;
+}
+.btn--mini{ padding:8px 10px; font-size:12px; }
+.btn--ghost{
+  background:#fff;
+  border:1px solid #c00000;
+  color:#c00000;
+}
+.btn:hover{ opacity:.97; }
+.cart{ display:flex; flex-direction:column; gap:10px; }
+.citem{
+  border:1px solid #ececec;
+  border-radius:16px;
+  padding:12px;
+  display:grid;
+  grid-template-columns: 1fr auto;
+  gap:12px;
+  background:#fff;
+  box-shadow:0 4px 14px rgba(17,17,17,.03);
+}
+.cleft .ctitle{ font-weight:900; margin-bottom:6px; }
+.cleft .csub{ font-size:12px; color:#666; display:flex; gap:8px; flex-wrap:wrap; }
+.qty{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:10px;
+}
+.qbtn{
+  width:32px; height:32px;
+  border-radius:10px;
+  border:1px solid #ddd;
+  background:#fff;
+  cursor:pointer;
+  font-weight:900;
+}
+.qnum{ min-width:20px; text-align:center; font-weight:900; }
+.totals{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:12px;
+  margin-top:8px;
+  border:1px solid #efefef;
+  border-radius:16px;
+  background:#fafafa;
+}
+.totals__row{ display:flex; justify-content:space-between; align-items:center; }
+.totals__row--big{ font-size:18px; color:#111; }
+.actions{ display:flex; gap:10px; margin-top:12px; }
+.actions .btn{ flex:1; }
+.empty{ padding:12px 0; }
+
+.ticketControls{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-top:14px;
+  padding:12px;
+  border:1px solid #ededed;
+  border-radius:16px;
+  background:#fff;
+}
+.chk{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-weight:800;
+  color:#222;
+}
+.chk input{ width:18px; height:18px; accent-color:#c00000; }
+.ticketBtns{ display:flex; gap:8px; }
+.ticketPreview{
+  margin-top:12px;
+  border:1px dashed #d6d6d6;
+  border-radius:16px;
+  padding:12px;
+  background:#fafafa;
+  min-height:120px;
+}
+.ticket{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:14px;
+  color:#111;
+  line-height:1.35;
+  font-weight:800;
+}
+.ticket *{ font-weight:800; }
+.ticket strong{ font-weight:900; }
+.ticket .t-title{ font-weight:900; text-align:center; font-size:15px; }
+.ticket .t-center{ text-align:center; }
+.ticket .t-row{ display:flex; justify-content:space-between; gap:10px; }
+.ticket .t-hr{ border-top:1px dashed #666; margin:8px 0; }
+.ticket .t-items{ display:flex; flex-direction:column; gap:4px; }
+.ticket .t-item{ display:flex; justify-content:space-between; gap:10px; }
+.ticket .t-item .l{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ticket .t-item .r{ flex:0 0 auto; font-weight:800; }
+.ticket .t-big{ font-size:16px; font-weight:900; }
+.t-logo{ max-width:140px; max-height:70px; object-fit:contain; margin:8px auto; display:block; }
+
+@media(max-width: 980px){
+  .ventas__grid{ grid-template-columns: 1fr; }
+  .card__head{ grid-template-columns: 1fr; }
+  .catalog{ grid-template-columns: 1fr; }
+  .actions{ flex-direction:column; }
+  .ticketControls{ flex-direction:column; align-items:stretch; }
+  .ticketBtns{ width:100%; }
+  .ticketBtns .btn{ flex:1; }
+}
+
+
+.status{
+  margin-top:12px;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid transparent;
+  font-weight:700;
+}
+.status--error{
+  background:#fff1f1;
+  color:#9f1111;
+  border-color:#f1b7b7;
+}
+.status--success{
+  background:#f3fbf5;
+  color:#18733a;
+  border-color:#b8e1c4;
+}
+.pmeta .sub .is-out,
+.cleft .csub .is-out{
+  background:#fff1f1;
+  border-color:#f1b7b7;
+  color:#9f1111;
+}
+.pmeta .sub .is-low,
+.cleft .csub .is-low{
+  background:#fff8e8;
+  border-color:#f3dda1;
+  color:#8b5a00;
+}
+.btn:disabled,
+.qbtn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
