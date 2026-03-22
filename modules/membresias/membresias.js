@@ -237,6 +237,17 @@
     mEnd.value = s.toISOString().slice(0,10);
   }
 
+
+
+  function getClientName(clientId){
+    if(typeof dpGetClientNameById === "function") return dpGetClientNameById(clientId);
+    const st = state();
+    const c = (st.clients||[]).find(x=>x.id===clientId);
+    if(c) return c.name || c.id || "Cliente";
+    if(clientId === "GEN") return "Cliente General";
+    return clientId || "Cliente";
+  }
+
   // ---------- Ticket helpers ----------
   function buildTicketHtmlFromSale(sale){
     const html = (typeof dpBuildTicketHtmlDocument === "function")
@@ -306,7 +317,7 @@
       saleTicketId: ""
     });
     mStatus.textContent = "Membresía guardada (sin cobro).";
-    renderList();
+    try{ renderList(); }catch(err){ console.error(err); }
   }
 
   function charge(){
@@ -314,42 +325,30 @@
     const plan = dpFindMembershipPlanById(mPlan.value);
     if(!plan){ alert("Selecciona un tipo de membresía."); return; }
 
-    try{
-      const ticketId = dpChargeMembership({
-        paymentMethod: (document.getElementById("membresiaPago")?.value || "efectivo"),
-        clientId: mClientId.value,
-        planId: plan.id,
-        startDate: mStart.value,
-        notes: (mNotes.value||"").trim()
-      });
+    const ticketId = dpChargeMembership({
+  paymentMethod: (document.getElementById('membresiaPago')?.value || 'efectivo'),
 
-      if(!ticketId){
-        mStatus.textContent = "No se pudo registrar el cobro de la membresía.";
-        mPrint.disabled = true;
-        return;
+      clientId: mClientId.value,
+      planId: plan.id,
+      startDate: mStart.value,
+      notes: (mNotes.value||"").trim()
+    });
+
+    mStatus.textContent = "Membresía cobrada. Ticket: " + (ticketId||"");
+    try{ renderList(); }catch(err){ console.error(err); }
+
+    if(mMakeTicket.checked && ticketId){
+      const sale = (state().sales||[]).find(s=>s.id===ticketId);
+      if(sale){
+        const t = buildTicketHtmlFromSale(sale);
+        mTicketPreview.innerHTML = t.pre;
+        lastTicketHtml = t.html;
+        lastTicketTitle = t.title;
+        mPrint.disabled = false;
       }
-
-      mStatus.textContent = "Membresía cobrada. Ticket: " + ticketId;
-      renderList();
-
-      if(mMakeTicket.checked){
-        const sale = (state().sales||[]).find(s=>s.id===ticketId);
-        if(sale){
-          const t = buildTicketHtmlFromSale(sale);
-          mTicketPreview.innerHTML = t.pre;
-          lastTicketHtml = t.html;
-          lastTicketTitle = t.title;
-          mPrint.disabled = false;
-          return;
-        }
-      }
-
+    }else{
       mTicketPreview.innerHTML = "Sin ticket.";
       lastTicketHtml = "";
-      mPrint.disabled = true;
-    }catch(err){
-      console.error("Error al cobrar membresía:", err);
-      mStatus.textContent = "Error al registrar membresía. Revisa consola o ticket.";
       mPrint.disabled = true;
     }
   }
